@@ -1,6 +1,7 @@
 import { Resend } from "resend"
 
 import { IS_DEMO } from "@/lib/demo"
+import { COMPANY_INFO } from "@/lib/company-info"
 
 const resendApiKey = process.env.RESEND_API_KEY
 
@@ -12,7 +13,7 @@ const resendApiKey = process.env.RESEND_API_KEY
 export const resendClient = IS_DEMO ? null : (resendApiKey ? new Resend(resendApiKey) : null)
 
 export const resendFromEmail =
-	process.env.RESEND_FROM_EMAIL || "Turismo Chile Tours <onboarding@resend.dev>"
+	process.env.RESEND_FROM_EMAIL || `${COMPANY_INFO.name} <onboarding@resend.dev>`
 
 export function canSendEmails() {
 	return Boolean(resendClient)

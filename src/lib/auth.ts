@@ -4,6 +4,7 @@ import { admin, twoFactor } from "better-auth/plugins"
 import { betterAuth } from "better-auth"
 
 import { prisma } from "./prisma"
+import { COMPANY_INFO } from "./company-info"
 
 export const auth = betterAuth({
 	database: prismaAdapter(prisma, {
@@ -26,7 +27,7 @@ export const auth = betterAuth({
 			},
 		},
 	},
-	plugins: [admin(), twoFactor({ issuer: "TurismoChileTours" }), nextCookies()],
+	plugins: [admin(), twoFactor({ issuer: COMPANY_INFO.name }), nextCookies()],
 })
 
 export type Session = typeof auth.$Infer.Session

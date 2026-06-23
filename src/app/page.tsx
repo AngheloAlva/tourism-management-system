@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import Image from "next/image"
 
 import { IS_DEMO } from "@/lib/demo"
+import { COMPANY_INFO } from "@/lib/company-info"
 import { LoginForm } from "@/project/auth/components/login-form"
 import Logo from "@/shared/components/sidebar/logo"
 
@@ -22,7 +23,7 @@ export default function Home() {
 						<Logo className="h-14 w-auto" />
 
 						<div className="flex flex-col leading-5">
-							<span>TurismoChileTours</span>
+							<span>{COMPANY_INFO.name}</span>
 							<span className="text-muted-foreground text-sm transition-colors">
 								Sistema de Gestión
 							</span>
