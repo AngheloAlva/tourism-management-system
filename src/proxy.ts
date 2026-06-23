@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSessionCookie } from "better-auth/cookies"
 
+import { IS_DEMO } from "@/lib/demo"
+
 export async function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl
 
 	// Auth gate for protected areas (preserves the original behavior).
-	if (pathname.startsWith("/dashboard") || pathname === "/cambiar-contrasena") {
+	// Skipped in demo mode: the dashboard layout performs transparent
+	// auto-login by injecting the pre-seeded session cookie. If the gate ran
+	// here it would bounce the first cookie-less /dashboard request back to "/",
+	// which redirects to /dashboard/inicio in demo — an infinite loop.
+	if (!IS_DEMO && (pathname.startsWith("/dashboard") || pathname === "/cambiar-contrasena")) {
 		const sessionCookie = getSessionCookie(request)
 
 		if (!sessionCookie) {

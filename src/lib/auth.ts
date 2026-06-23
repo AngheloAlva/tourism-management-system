@@ -4,6 +4,7 @@ import { admin, twoFactor } from "better-auth/plugins"
 import { betterAuth } from "better-auth"
 
 import { prisma } from "./prisma"
+import { IS_DEMO } from "./demo"
 import { COMPANY_INFO } from "./company-info"
 
 export const auth = betterAuth({
@@ -11,6 +12,15 @@ export const auth = betterAuth({
 		provider: "postgresql",
 	}),
 	baseURL: process.env.NEXT_PUBLIC_BASE_URL,
+	advanced: {
+		// Demo auto-login injects a raw, pre-seeded session cookie
+		// (`better-auth.session_token`) from the dashboard layout. On HTTPS
+		// Better Auth would prefix the cookie with `__Secure-`, so the injected
+		// name would never resolve and the dashboard would loop. Disabling
+		// secure cookies in demo keeps the un-prefixed name consistent.
+		// Production keeps Better Auth's default (auto-secure on HTTPS).
+		useSecureCookies: IS_DEMO ? false : undefined,
+	},
 	rateLimit: {
 		enabled: process.env.DISABLE_RATE_LIMIT !== "1",
 	},
