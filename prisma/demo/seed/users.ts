@@ -11,7 +11,7 @@
 
 import { createHash } from "node:crypto"
 // Direct relative path — @generated/* alias is resolved by Next/tsc but not by tsx at runtime.
-import type { PrismaClient } from "../../../../src/generated/prisma/client"
+import type { PrismaClient } from "../../../src/generated/prisma/client"
 import { DEMO_USER_EMAIL, DEMO_USER_PASSWORD, SELLER_NAMES } from "./constants"
 
 /** Deterministic bcrypt-compatible hash placeholder.

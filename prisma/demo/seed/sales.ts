@@ -12,7 +12,7 @@
 
 import { faker } from "@faker-js/faker"
 // Direct relative path — @generated/* alias is resolved by Next/tsc but not by tsx at runtime.
-import type { PrismaClient } from "../../../../src/generated/prisma/client"
+import type { PrismaClient } from "../../../src/generated/prisma/client"
 import { SALE_SCENARIOS } from "./constants"
 
 faker.seed(46)

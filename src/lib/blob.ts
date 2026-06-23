@@ -4,7 +4,8 @@ import { IS_DEMO } from "./demo"
 
 interface UploadBlobOptions {
 	contentType: string
-	access?: "public" | "private"
+	// @vercel/blob@2.x put() only supports public blobs.
+	access?: "public"
 }
 
 interface UploadBlobResult {

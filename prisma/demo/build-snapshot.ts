@@ -74,8 +74,8 @@ async function buildSnapshot(): Promise<void> {
   await prisma.$disconnect()
   console.log("Seed complete.")
 
-  // Step 4: Dump snapshot
-  const blob = await pglite.dumpDataDir("tar.gz")
+  // Step 4: Dump snapshot (gzipped tar — PGlite 0.5.x compression option)
+  const blob = await pglite.dumpDataDir("gzip")
   const buffer = Buffer.from(await blob.arrayBuffer())
   writeFileSync(SNAPSHOT_PATH, buffer)
   console.log(`Snapshot written to ${SNAPSHOT_PATH} (${buffer.length} bytes).`)
