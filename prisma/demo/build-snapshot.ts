@@ -23,7 +23,8 @@ import { execFileSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { PGlite } from "@electric-sql/pglite"
-import { PrismaClient } from "@generated/prisma/client"
+// Direct relative path — @generated/* alias is resolved by Next/tsc but not by tsx at runtime.
+import { PrismaClient } from "../../src/generated/prisma/client"
 import { PrismaPGlite } from "pglite-prisma-adapter"
 import { runSeed } from "./seed/index"
 
@@ -45,19 +46,24 @@ async function buildSnapshot(): Promise<void> {
   // Generate SQL from the Prisma schema without needing migrations directory.
   // `prisma migrate diff --from-empty --to-schema-datamodel` produces CREATE TABLE
   // statements for the full schema.
-  const ddl = execFileSync(
+  // Prisma 7+: --to-schema-datamodel was removed; use --to-schema
+  const rawDdl = execFileSync(
     "pnpm",
     [
       "prisma",
       "migrate",
       "diff",
       "--from-empty",
-      "--to-schema-datamodel",
+      "--to-schema",
       "prisma/schema.prisma",
       "--script",
     ],
     { encoding: "utf8" },
   )
+  // Strip any non-SQL preamble (e.g. dotenv header lines that leak onto stdout).
+  // SQL starts at the first "-- " comment or at the first SQL keyword.
+  const ddlStart = rawDdl.indexOf("-- ")
+  const ddl = ddlStart > 0 ? rawDdl.slice(ddlStart) : rawDdl
   await pglite.exec(ddl)
   console.log("DDL applied.")
 
