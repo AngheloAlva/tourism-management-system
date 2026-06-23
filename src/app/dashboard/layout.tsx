@@ -1,7 +1,10 @@
+export const dynamic = "force-dynamic"
+
 import { redirect } from "next/navigation"
-import { headers } from "next/headers"
+import { headers, cookies } from "next/headers"
 
 import { auth } from "@/lib/auth"
+import { IS_DEMO } from "@/lib/demo"
 import { getCurrentUserAccess } from "@/project/roles/actions/role.actions"
 import { getModuleKeyFromPath } from "@/project/roles/constants/modules"
 
@@ -10,14 +13,43 @@ import SidebarHeader from "@/shared/components/sidebar/sidebar-header"
 import { AppSidebar } from "@/shared/components/sidebar/app-sidebar"
 import { TooltipProvider } from "@/shared/components/ui/tooltip"
 
+import DemoBanner from "@/project/demo/components/demo-banner"
+
+/** Long-lived session token seeded into the PGlite snapshot. */
+const DEMO_SESSION_TOKEN = "demo-session-token-atacama-2026"
+/** Better Auth default session cookie name. */
+const BA_COOKIE_NAME = "better-auth.session_token"
+
 export default async function RootLayout({
 	children,
 }: Readonly<{
 	children: React.ReactNode
 }>) {
-	const session = await auth.api.getSession({
+	let session = await auth.api.getSession({
 		headers: await headers(),
 	})
+
+	// ── Demo: transparent auto-login ─────────────────────────────────────────
+	// When no session exists in demo mode, inject the pre-seeded session cookie
+	// so Better Auth can resolve it on subsequent requests. We call getSession
+	// again with the demo token to validate it against the PGlite snapshot.
+	if (IS_DEMO && !session) {
+		const cookieStore = await cookies()
+		cookieStore.set(BA_COOKIE_NAME, DEMO_SESSION_TOKEN, {
+			httpOnly: true,
+			sameSite: "lax",
+			path: "/",
+			// Max-age: 1 year (the seeded session itself expires 2099)
+			maxAge: 60 * 60 * 24 * 365,
+		})
+
+		// Re-read session with the newly set cookie by forwarding the updated
+		// cookie header. Better Auth nextCookies plugin already reads from the
+		// Next.js cookie store, so getting headers again picks it up.
+		session = await auth.api.getSession({
+			headers: await headers(),
+		})
+	}
 
 	if (!session) {
 		return redirect("/")
@@ -50,6 +82,8 @@ export default async function RootLayout({
 
 				<SidebarInset className="w-auto min-w-0">
 					<SidebarHeader />
+
+					{IS_DEMO && <DemoBanner />}
 
 					<main className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">{children}</main>
 				</SidebarInset>

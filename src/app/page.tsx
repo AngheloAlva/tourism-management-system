@@ -1,11 +1,19 @@
+import { redirect } from "next/navigation"
 import Image from "next/image"
 
+import { IS_DEMO } from "@/lib/demo"
 import { LoginForm } from "@/project/auth/components/login-form"
 import Logo from "@/shared/components/sidebar/logo"
 
 import loginImage from "../../public/images/login.jpg"
 
 export default function Home() {
+	// In demo mode, skip the login page entirely — the dashboard layout handles
+	// auto-login via the seeded session token.
+	if (IS_DEMO) {
+		redirect("/dashboard/inicio")
+	}
+
 	return (
 		<div className="grid min-h-svh lg:grid-cols-2">
 			<div className="flex flex-col gap-4 p-6 md:p-10">
