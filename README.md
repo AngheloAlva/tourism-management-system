@@ -1,3 +1,24 @@
+# dashboard-turismo
+
+Dashboard de operaciones interno para una agencia de turismo en San Pedro de Atacama, Chile. Cubre ventas/cotizaciones, calendario, recepciones, transfers, agencias, proveedores, flujo de caja, comisiones, facturación, aprobaciones, alertas, analíticas, usuarios y roles.
+
+> **Stack**: Next.js 16 (App Router) · React 19 · Prisma 7 · PostgreSQL · Better Auth · TanStack · shadcn/ui · Tailwind 4 · Zod 4
+
+## Modos de ejecución
+
+La aplicación corre en dos modos, seleccionados por la variable de entorno `DEMO_MODE`:
+
+| Modo | `DEMO_MODE` | Base de datos | Comportamiento |
+| --- | --- | --- | --- |
+| **Producción** | ausente / `false` | PostgreSQL (Neon) vía `@prisma/adapter-pg` | Marca real, emails (Resend), uploads (Vercel Blob) y rate limiting activos. |
+| **Demo** | `"true"` | PGlite (Postgres en proceso) cargado desde un snapshot bundleado | Marca ficticia, auto-login, emails y uploads mockeados, sin servicios externos. |
+
+El flag es la única costura entre ambos modos: el mismo esquema Prisma (incluidos los campos `@db.Date`) y los mismos server actions corren sin cambios en los dos, porque PGlite ES Postgres real. El switch vive en `src/lib/prisma.ts`; `src/lib/demo.ts` expone el flag como `IS_DEMO`.
+
+La demo pública es 100% autocontenida: no requiere infraestructura externa (sin Neon, sin tokens, sin servicios gestionados). Para desplegarla basta con definir `DEMO_MODE=true`, `NEXT_PUBLIC_BASE_URL`, `BETTER_AUTH_SECRET` y un `DATABASE_URL` dummy.
+
+---
+
 ## 🧩 Módulo: Registro de Ventas
 
 ### 🔹 Bloque 1: Información General
