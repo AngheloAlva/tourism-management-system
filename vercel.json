@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/expire-approvals",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/complete-events",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}

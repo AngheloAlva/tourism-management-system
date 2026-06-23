@@ -1,0 +1,81 @@
+@media print {
+	/* Ocultar elementos que no deben imprimirse */
+	.print\:hidden {
+		display: none !important;
+	}
+
+	/* Configuración de página */
+	@page {
+		size: A4;
+		margin: 1.5cm;
+	}
+
+	/* Evitar saltos de página dentro de elementos importantes */
+	table,
+	.no-break {
+		page-break-inside: avoid;
+	}
+
+	/* Asegurar que los encabezados de tabla se repitan en cada página */
+	thead {
+		display: table-header-group;
+	}
+
+	/* Mejorar la legibilidad del texto */
+	body {
+		print-color-adjust: exact;
+		-webkit-print-color-adjust: exact;
+	}
+
+	/* Ajustar el tamaño de fuente para impresión */
+	* {
+		font-size: 10pt !important;
+	}
+
+	h1 {
+		font-size: 18pt !important;
+	}
+
+	h2,
+	h3 {
+		font-size: 14pt !important;
+	}
+
+	/* Asegurar que los colores se impriman */
+	.bg-emerald-100,
+	.bg-amber-100,
+	.bg-muted\/20,
+	.bg-muted\/30,
+	.bg-muted\/40,
+	.bg-muted\/90 {
+		print-color-adjust: exact;
+		-webkit-print-color-adjust: exact;
+	}
+
+	/* Optimizar el espaciado para impresión */
+	.space-y-16 > * + * {
+		margin-top: 2cm !important;
+	}
+
+	.space-y-6 > * + * {
+		margin-top: 0.5cm !important;
+	}
+
+	/* Asegurar que las tablas se vean bien */
+	table {
+		width: 100%;
+		border-collapse: collapse;
+	}
+
+	th,
+	td {
+		border: 1px solid #ddd;
+		padding: 8px;
+		text-align: left;
+	}
+
+	/* Evitar que las secciones se dividan entre páginas */
+	section {
+		page-break-inside: avoid;
+	}
+}

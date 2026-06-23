@@ -1,0 +1,1346 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  // binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  rut           String?
+  phone         String?
+  birthDate     DateTime? @db.Date
+  workSchedule  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  role               String?
+  banned             Boolean?         @default(false)
+  banReason          String?
+  banExpires         DateTime?
+  mustChangePassword Boolean          @default(true)
+  twoFactorEnabled   Boolean          @default(false)
+  sales              SaleRecord[]
+  agencyTransfers    AgencyTransfer[]
+  twoFactor          TwoFactor[]
+
+  // Flujo de Caja
+  cashBoxEntries     CashBoxEntry[]           @relation("CashBoxEntries")
+  cashCounts         CashCount[]              @relation("CashCounts")
+  cashDeposits       CashDeposit[]            @relation("CashDeposits")
+  supplierPayments   SupplierPayment[]        @relation("SupplierPayments")
+  cancelledEvents    Event[]                  @relation("EventCancelledBy")
+  cancelledBookings  EventBooking[]           @relation("BookingCancelledBy")
+  approvalRequests   ApprovalRequest[]        @relation("ApprovalRequestedBy")
+  verifiedApprovals  ApprovalRequest[]        @relation("ApprovalVerifiedBy")
+  resolvedApprovals  ApprovalRequest[]        @relation("ApprovalResolvedBy")
+  commissionsPaid    EventBookingCommission[] @relation("CommissionPaidBy")
+  cancelledTransfers AgencyTransfer[]         @relation("TransferCancelledBy")
+
+  @@unique([email])
+  @@index([rut])
+  @@map("user")
+}
+
+model Role {
+  id          String                 @id @default(cuid())
+  key         String                 @unique
+  name        String
+  description String?
+  isSystem    Boolean                @default(false)
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  permissions RoleModulePermission[]
+
+  @@index([isSystem])
+  @@index([isActive])
+  @@map("role")
+}
+
+model RoleModulePermission {
+  id          String   @id @default(cuid())
+  moduleKey   String
+  visible     Boolean  @default(false)
+  canInteract Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, moduleKey])
+  @@index([moduleKey])
+  @@map("role_module_permission")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  impersonatedBy String?
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}
+
+model TwoFactor {
+  id          String @id @default(cuid())
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([secret])
+  @@map("two_factor")
+}
+
+enum SALE_TYPE {
+  SALE
+  QUOTE
+}
+
+enum CommissionKind {
+  REGULAR
+  SPECIAL
+}
+
+enum CHANNEL_TYPE {
+  ONLINE
+  AGENCY
+  PHYSICAL
+  WHOLESALE
+}
+
+enum VOUCHER_STATUS {
+  TO_BE_DONE // Por realizar
+  IN_PROGRESS // En proceso
+  COMPLETED // Finalizado
+  CANCELLED // Anulado
+}
+
+enum OPERATOR_PAYMENT_STATUS {
+  UNKNOWN
+  PENDING
+  PARTIALLY_PAID
+  PAID
+}
+
+model SaleRecord {
+  id                          String                  @id @default(cuid())
+  voucher                     Int                     @unique
+  type                        SALE_TYPE
+  channel                     CHANNEL_TYPE
+  status                      VOUCHER_STATUS          @default(TO_BE_DONE)
+  operatorPaymentStatus       OPERATOR_PAYMENT_STATUS @default(UNKNOWN)
+  clientEmail                 String?
+  fileNumber                  String?
+  comments                    String?
+  discount                    Float                   @default(0)
+  isWholesale                 Boolean                 @default(false)
+  wholesalePaymentTerm        WHOLESALE_PAYMENT_TERM  @default(IMMEDIATE)
+  wholesaleMarkup             Float                   @default(0)
+  contacted                   Boolean                 @default(false)
+  customerVoucherEmailSentAt  DateTime?
+  customerVoucherEmailSentTo  String?
+  wholesaleVoucherEmailSentAt DateTime?
+  wholesaleVoucherEmailSentTo String?
+  voucherOutdatedAt           DateTime?
+  firstEventDate              DateTime?               @db.Date
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+
+  sellerId             String
+  seller               User                  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  agencyId             String?
+  agency               Agency?               @relation("AgencySales", fields: [agencyId], references: [id], onDelete: Cascade)
+  wholesaleAgencyId    String?
+  wholesaleAgency      Agency?               @relation("WholesaleAgency", fields: [wholesaleAgencyId], references: [id], onDelete: SetNull)
+  passengers           Passenger[]
+  paymentRecords       PaymentRecord[]
+  transfers            AgencyTransfer[]
+  eventBookings        EventBooking[]
+  wholesaleInvoiceLine WholesaleInvoiceLine?
+
+  convertedFromQuoteId String?     @unique
+  convertedFromQuote   SaleRecord? @relation("QuoteToSale", fields: [convertedFromQuoteId], references: [id], onDelete: SetNull)
+  convertedToSale      SaleRecord? @relation("QuoteToSale")
+  conversionReason     String?
+
+  @@index([voucher])
+  @@index([sellerId])
+  @@index([agencyId])
+  @@index([wholesaleAgencyId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([operatorPaymentStatus])
+  @@index([wholesalePaymentTerm])
+  @@index([sellerId, firstEventDate])
+  @@index([wholesaleAgencyId, firstEventDate])
+  @@map("sale_record")
+}
+
+model VoucherCounter {
+  id   String @id @default("counter")
+  code Int    @default(0)
+
+  @@map("voucher_counter")
+}
+
+model AgencyTransferCounter {
+  id   String @id @default("agency_transfer_counter")
+  code Int    @default(0)
+
+  @@map("agency_transfer_counter")
+}
+
+enum SALE_MODE {
+  REGULAR
+  PRIVATE
+}
+
+enum DIET_TYPE {
+  NORMAL
+  VEGETARIAN
+  VEGAN
+  CELIAC
+  OTHER
+}
+
+model Passenger {
+  id                  String     @id @default(cuid())
+  name                String?
+  document            String?
+  age                 Int?
+  nationality         String?
+  diet                DIET_TYPE?
+  dietOther           String?
+  specialEntranceType String?
+  allergies           String[]   @default([])
+  phone               String?
+  email               String?
+  complimentary         Boolean    @default(false)
+  complimentaryCategory String?
+
+  saleRecordId               String?
+  saleRecord                 SaleRecord?           @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
+  transferId                 String?
+  transfer                   AgencyTransfer?       @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  sourceTransferPriceDetails TransferPriceDetail[] @relation("PassengerTransferPrices")
+  hotels                     PassengerHotel[]
+  bookingPassengers          BookingPassenger[]
+
+  @@index([saleRecordId])
+  @@index([transferId])
+  @@map("passenger")
+}
+
+model PassengerHotel {
+  id          String    @id @default(cuid())
+  hotelName   String
+  checkIn     DateTime? @db.Date
+  checkOut    DateTime? @db.Date
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  passengerId String
+  passenger   Passenger @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+
+  @@index([passengerId])
+  @@map("passenger_hotel")
+}
+
+enum PAYMENT_METHOD {
+  CASH
+  TRANSFER
+  CREDIT_CARD
+  DEBIT_CARD
+  PAYMENT_LINK_DEBIT
+  PAYMENT_LINK_CREDIT
+}
+
+enum CURRENCY_TYPE {
+  CLP
+  USD
+}
+
+enum WHOLESALE_PAYMENT_TERM {
+  IMMEDIATE
+  POSTPAID
+}
+
+enum WHOLESALE_INVOICE_STATUS {
+  DRAFT
+  ISSUED
+  SENT
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum WHOLESALE_INVOICE_DOCUMENT_STATUS {
+  PENDING
+  GENERATED
+  SENT
+}
+
+model PaymentRecord {
+  id                String         @id @default(cuid())
+  refund            Boolean        @default(false)
+  method            PAYMENT_METHOD
+  methodOther       String?
+  amount            Float
+  currency          CURRENCY_TYPE  @default(CLP)
+  originalAmount    Float?
+  exchangeRate      Float?
+  date              DateTime
+  comments          String?
+  documentNumber    String?
+  voucherUrl        String?
+  isEntranceFee     Boolean        @default(false)
+  isTransferPayment Boolean        @default(false)
+
+  saleRecordId String?
+  saleRecord   SaleRecord?     @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
+  transferId   String?
+  transfer     AgencyTransfer? @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([transferId])
+  @@index([saleRecordId])
+  @@map("payment_record")
+}
+
+model WholesaleInvoice {
+  id             String                            @id @default(cuid())
+  number         String?                           @unique
+  periodStart    DateTime                          @db.Date
+  periodEnd      DateTime                          @db.Date
+  status         WHOLESALE_INVOICE_STATUS          @default(DRAFT)
+  documentStatus WHOLESALE_INVOICE_DOCUMENT_STATUS @default(PENDING)
+  currency       CURRENCY_TYPE                     @default(CLP)
+  subtotal       Float                             @default(0)
+  discountAmount Float                             @default(0)
+  taxAmount      Float                             @default(0)
+  totalAmount    Float                             @default(0)
+  paidAmount     Float                             @default(0)
+  pendingAmount  Float                             @default(0)
+  issuedAt       DateTime?
+  sentAt         DateTime?
+  dueAt          DateTime?                         @db.Date
+  reference      String?
+  notes          String?
+  createdAt      DateTime                          @default(now())
+  updatedAt      DateTime                          @updatedAt
+
+  agencyId String
+  agency   Agency @relation("AgencyWholesaleInvoices", fields: [agencyId], references: [id], onDelete: Cascade)
+
+  lines    WholesaleInvoiceLine[]
+  payments WholesaleInvoicePayment[]
+
+  @@index([agencyId])
+  @@index([status])
+  @@index([documentStatus])
+  @@index([periodStart, periodEnd])
+  @@index([createdAt])
+  @@map("wholesale_invoice")
+}
+
+model WholesaleInvoiceLine {
+  id             String   @id @default(cuid())
+  description    String?
+  grossAmount    Float    @default(0)
+  discountAmount Float    @default(0)
+  netAmount      Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  invoiceId String
+  invoice   WholesaleInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  saleRecordId String     @unique
+  saleRecord   SaleRecord @relation(fields: [saleRecordId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@index([saleRecordId])
+  @@map("wholesale_invoice_line")
+}
+
+model WholesaleInvoicePayment {
+  id             String         @id @default(cuid())
+  method         PAYMENT_METHOD
+  currency       CURRENCY_TYPE  @default(CLP)
+  amount         Float
+  originalAmount Float?
+  exchangeRate   Float?
+  paymentDate    DateTime       @db.Date
+  reference      String?
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  invoiceId String
+  invoice   WholesaleInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([paymentDate])
+  @@map("wholesale_invoice_payment")
+}
+
+model Agency {
+  id            String   @id @default(cuid())
+  name          String
+  contactEmails String[]
+  phone         String?
+  country       String?
+  address       String?
+  website       String?
+  taxId         String?
+  codePrefix    String?
+  codeLength    Int?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sales             SaleRecord[]        @relation("AgencySales")
+  wholesaleSales    SaleRecord[]        @relation("WholesaleAgency")
+  wholesaleInvoices WholesaleInvoice[]  @relation("AgencyWholesaleInvoices")
+  tourPricing       AgencyTourPricing[]
+
+  @@index([name])
+  @@index([createdAt])
+  @@map("agency")
+}
+
+model TransferAgency {
+  id            String   @id @default(cuid())
+  name          String
+  contactEmails String[]
+  phone         String?
+  country       String?
+  address       String?
+  website       String?
+  taxId         String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transfers AgencyTransfer[]
+
+  @@index([name])
+  @@index([createdAt])
+  @@map("transfer_agency")
+}
+
+model AgencyTourPricing {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agencyId               String
+  agency                 Agency                         @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tourId                 String
+  tour                   Tour                           @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  privatePriceTiers      AgencyTourPrivatePricingTier[]
+  priceCategoryOverrides AgencyPriceCategoryOverride[]
+  entryOverrides         AgencyEntryOverride[]
+
+  @@unique([agencyId, tourId])
+  @@index([agencyId])
+  @@index([tourId])
+  @@map("agency_tour_pricing")
+}
+
+model AgencyTourPrivatePricingTier {
+  id        String   @id @default(cuid())
+  capacity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agencyTourPricingId String
+  agencyTourPricing   AgencyTourPricing @relation(fields: [agencyTourPricingId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyTourPricingId, capacity])
+  @@index([agencyTourPricingId])
+  @@map("agency_tour_private_pricing_tier")
+}
+
+enum EVENT_STATUS {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  TRANSFERRED
+}
+
+enum EVENT_SERVICE_KIND {
+  TOUR
+  TRANSFER
+}
+
+model Event {
+  id                 String             @id @default(cuid())
+  serviceKind        EVENT_SERVICE_KIND @default(TOUR)
+  mode               SALE_MODE
+  date               DateTime   @db.Date
+  startTime          String?
+  endTime            String?
+  maxCapacity        Int                @default(12)
+  currentBookings    Int                @default(0)
+  status             EVENT_STATUS       @default(SCHEDULED)
+  cateringProviderId String?
+  cateringProvider   Provider?          @relation("EventCatering", fields: [cateringProviderId], references: [id])
+  guideCost          Float              @default(0)
+  driverCost         Float              @default(0)
+  vehicleCost        Float              @default(0)
+  cateringCost       Float              @default(0)
+  cateringSelection  Json?
+  comments           String?
+  cateringNotes      String?
+  operationalNotes   String?
+  cancelReason       String?
+  cancelledAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  profitCalculated   Float?
+  totalRevenue       Float?
+
+  tourId String?
+  tour   Tour?   @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  transferServiceId String?
+  transferService   TransferService? @relation(fields: [transferServiceId], references: [id], onDelete: Cascade)
+
+  guideId String?
+  guide   Provider? @relation("EventGuide", fields: [guideId], references: [id])
+
+  driverId String?
+  driver   Provider? @relation("EventDriver", fields: [driverId], references: [id])
+
+  vehicleId String?
+  vehicle   Provider? @relation("EventVehicle", fields: [vehicleId], references: [id])
+
+  cancelledById String?
+  cancelledBy   User?   @relation("EventCancelledBy", fields: [cancelledById], references: [id])
+
+  cancellationRequestId String?
+
+  bookings   EventBooking[]
+  transfers  TransferEventBooking[]
+  provider   Provider?              @relation(fields: [providerId], references: [id])
+  providerId String?
+
+  @@index([date])
+  @@index([tourId])
+  @@index([transferServiceId])
+  @@index([serviceKind])
+  @@index([status])
+  @@index([date, mode])
+  @@index([date, status])
+  @@index([date, tourId])
+  @@index([guideId])
+  @@index([driverId])
+  @@index([vehicleId])
+  @@index([cancelledAt])
+  @@index([cancelledById])
+  @@map("event")
+}
+
+enum APPROVAL_ACTION {
+  CANCEL_EVENT
+  CANCEL_BOOKING
+  LOCK_EVENT_EDIT
+  CANCEL_TRANSFER
+  CANCEL_RECEPTION
+  DELETE_RECEPTION
+  DELETE_SALE_RECORD
+  CANCEL_SALE_RECORD
+  UPDATE_INVOICED_SALE
+  DELETE_AGENCY
+  DELETE_PROVIDER
+  BAN_USER
+  ANNUL_CASH_ENTRY
+  CANCEL_COMMISSION_PAYMENT
+  DELETE_TRANSFER
+  UPDATE_TRANSFER
+}
+
+enum APPROVAL_STATUS {
+  PENDING
+  APPROVED
+  EXECUTED
+  REJECTED
+  EXPIRED
+  INVALIDATED
+  FAILED
+}
+
+model ApprovalRequest {
+  id         String          @id @default(cuid())
+  action     APPROVAL_ACTION
+  status     APPROVAL_STATUS @default(PENDING)
+  domain     String
+  targetType String
+  targetId   String
+  reason     String?
+
+  // Legacy code flow (compat con registros existentes)
+  codeHash  String?
+  codeLast4 String?
+  expiresAt DateTime?
+  usedAt    DateTime?
+
+  // Async lifecycle
+  targetFingerprint  String?
+  snapshot           Json?
+  resolvedAt         DateTime?
+  resolvedById       String?
+  resolvedBy         User?     @relation("ApprovalResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  executedAt         DateTime?
+  executionError     String?
+  invalidationReason String?
+
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requestedById String
+  requestedBy   User    @relation("ApprovalRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  verifiedById  String?
+  verifiedBy    User?   @relation("ApprovalVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([action])
+  @@index([domain, status])
+  @@index([targetType, targetId])
+  @@index([expiresAt])
+  @@index([requestedById])
+  @@index([status, createdAt])
+  @@index([requestedById, status])
+  @@index([resolvedById])
+  @@map("approval_request")
+}
+
+model EventBooking {
+  id             String    @id @default(cuid())
+  passengerCount Int
+  flyDate        String?
+  flyTime        String?
+  flyName        String?
+  specialRequest String?
+  cancelled      Boolean   @default(false)
+  cancelReason   String?
+  cancelledAt    DateTime?
+  cancelledById  String?
+  cancelledBy    User?     @relation("BookingCancelledBy", fields: [cancelledById], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  eventId           String
+  event             Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  saleRecordId      String
+  saleRecord        SaleRecord               @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
+  bookingPassengers BookingPassenger[]
+  priceEntries      BookingPriceEntry[]
+  entrySnapshots    BookingEntrySnapshot[]
+  commissions       EventBookingCommission[]
+
+  @@index([eventId])
+  @@index([saleRecordId])
+  @@index([cancelledById])
+  @@map("event_booking")
+}
+
+model BookingPassenger {
+  id             String       @id @default(cuid())
+  eventBookingId String
+  eventBooking   EventBooking @relation(fields: [eventBookingId], references: [id], onDelete: Cascade)
+  passengerId    String
+  passenger      Passenger    @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+  excluded       Boolean      @default(false)
+  excludeReason  String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([eventBookingId, passengerId])
+  @@index([eventBookingId])
+  @@index([passengerId])
+  @@map("booking_passenger")
+}
+
+enum PROVIDER_TYPE {
+  NATURAL
+  JURIDICA
+}
+
+enum GIRO_TYPE {
+  EXENTO
+  AFECTO
+}
+
+model Provider {
+  id       String        @id @default(cuid())
+  type     PROVIDER_TYPE
+  rut      String        @unique
+  isActive Boolean       @default(true)
+
+  // Persona Natural
+  fullName  String?
+  birthDate DateTime? @db.Date
+
+  // Persona Jurídica
+  companyName String?
+  category    String?
+  giro        GIRO_TYPE?
+
+  // Común
+  address String?
+  phone   String?
+  email   String?
+
+  // Servicios (flags)
+  conductor        Boolean @default(false)
+  maquina          Boolean @default(false)
+  transferOut      Boolean @default(false)
+  cocteleria       Boolean @default(false)
+  conductorMaquina Boolean @default(false)
+  transferIn       Boolean @default(false)
+  guia             Boolean @default(false)
+  otros            Boolean @default(false)
+
+  // Campos específicos de Conductor
+  licenseType           String?
+  licenseUrl            String?
+  licenseRenovationDate DateTime? @db.Date
+  carnetUrl             String?
+  carnetRenovationDate  DateTime? @db.Date
+
+  // Campos específicos de Guía
+  sernaturRegistry       String?
+  sernaturRenovationDate DateTime? @db.Date
+
+  // Campos específicos de Vehículo/Máquina
+  vehicleBrand      String?
+  vehicleModel      String?
+  vehicleYear       Int?
+  vehiclePlate      String?
+  vehicleCapacity   Int?
+  mileage           String?
+  vehicleEfficiency String? // Rendimiento (ej: 10 km/l)
+
+  // Documentación Vehículo
+  technicalRevisionUrl  String?
+  technicalRevisionDate DateTime? @db.Date
+  circulationPermitUrl  String?
+  circulationPermitDate DateTime? @db.Date
+  decree80Url           String?
+  decree80Date          DateTime? @db.Date
+
+  // Catering Relacionado
+  catering ProviderCatering[]
+
+  // Otros
+  otherDescription String?
+  costPerDay       Float   @default(0)
+  guideCost        Float   @default(0)
+  driverCost       Float   @default(0)
+  vehicleCost      Float   @default(0)
+  transferInCost   Float   @default(0)
+  transferOutCost  Float   @default(0)
+  otherCost        Float   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventsAsGuide    Event[] @relation("EventGuide")
+  eventsAsDriver   Event[] @relation("EventDriver")
+  eventsAsVehicle  Event[] @relation("EventVehicle")
+  eventsAsCatering Event[] @relation("EventCatering")
+  events           Event[]
+
+  supplierPayments SupplierPayment[] @relation("SupplierPayments")
+
+  @@index([rut])
+  @@index([isActive])
+  @@map("provider")
+}
+
+model CateringOption {
+  id     String  @id @default(cuid())
+  name   String  @unique // Desayuno, Almuerzo, Coctel, BoxLunch
+  active Boolean @default(true)
+
+  providers ProviderCatering[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("catering_option")
+}
+
+model ProviderCatering {
+  id               String         @id @default(cuid())
+  providerId       String
+  provider         Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  cateringOptionId String
+  cateringOption   CateringOption @relation(fields: [cateringOptionId], references: [id], onDelete: Cascade)
+
+  pricePerPerson Float @default(0)
+  pricingRules   Json? // Reglas de volumen: { "12": 10000, "20": 8000 } o estructuras más complejas
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, cateringOptionId])
+  @@map("provider_catering")
+}
+
+enum TRANSFER_DIRECTION {
+  IN
+  OUT
+}
+
+model TransferService {
+  id                         String             @id @default(cuid())
+  name                       String             @unique
+  direction                  TRANSFER_DIRECTION
+  pricePerPassenger          Float
+  receptionPricePerPassenger Float
+  active                     Boolean            @default(true)
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+
+  events Event[]
+
+  @@index([active])
+  @@index([direction])
+  @@map("transfer_service")
+}
+
+model Tour {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  recommendations String?
+  startTime       String?
+  endTime         String?
+  websiteUrl      String?
+  imageUrl        String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  maxCapacity     Int      @default(12)
+
+  generalSummaryEs String?
+  generalSummaryEn String?
+  generalSummaryPt String?
+  scheduleEs       String?
+  scheduleEn       String?
+  schedulePt       String?
+  includesEs       String?
+  includesEn       String?
+  includesPt       String?
+  pickupEs         String?
+  pickupEn         String?
+  pickupPt         String?
+  whatToBringEs    String?
+  whatToBringEn    String?
+  whatToBringPt    String?
+  altitudeEs       String?
+  altitudeEn       String?
+  altitudePt       String?
+
+  events            Event[]
+  agencyPricing     AgencyTourPricing[]
+  privatePriceTiers TourPrivatePricingTier[]
+  priceCategories   TourPriceCategory[]
+
+  @@index([name])
+  @@index([createdAt])
+  @@map("tour")
+}
+
+model TourPrivatePricingTier {
+  id         String   @id @default(cuid())
+  capacity   Int
+  price      Float
+  entryPrice Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tourId String
+  tour   Tour   @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@unique([tourId, capacity])
+  @@index([tourId])
+  @@map("tour_private_pricing_tier")
+}
+
+// ─── New pricing models (separate tour pricing from entries) ─────────────────
+
+model TourPriceCategory {
+  id             String   @id @default(cuid())
+  name           String
+  price          Float
+  receptionPrice Float    @default(0)
+  transferPrice  Float    @default(0)
+  minPrice       Float?
+  maxPrice       Float?
+  ageMin         Int?
+  ageMax         Int?
+  isDefault      Boolean  @default(false)
+  isSpecial      Boolean  @default(false)
+  sortOrder      Int      @default(0)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tourId          String
+  tour            Tour                          @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  entries         TourEntry[]
+  priceEntries    BookingPriceEntry[]
+  agencyOverrides AgencyPriceCategoryOverride[]
+
+  @@unique([tourId, name])
+  @@index([tourId])
+  @@map("tour_price_category")
+}
+
+model TourEntry {
+  id          String   @id @default(cuid())
+  name        String
+  variantName String
+  price       Float
+  isDefault   Boolean  @default(false)
+  isSpecial   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  priceCategoryId String
+  priceCategory   TourPriceCategory      @relation(fields: [priceCategoryId], references: [id], onDelete: Cascade)
+  entrySnapshots  BookingEntrySnapshot[]
+  agencyOverrides AgencyEntryOverride[]
+
+  @@unique([priceCategoryId, name, variantName])
+  @@index([priceCategoryId])
+  @@map("tour_entry")
+}
+
+model BookingPriceEntry {
+  id                String   @id @default(cuid())
+  count             Int
+  priceSnapshot     Float
+  receptionSnapshot Float    @default(0)
+  categoryName      String
+  createdAt         DateTime @default(now())
+
+  eventBookingId      String
+  eventBooking        EventBooking       @relation(fields: [eventBookingId], references: [id], onDelete: Cascade)
+  tourPriceCategoryId String?
+  tourPriceCategory   TourPriceCategory? @relation(fields: [tourPriceCategoryId], references: [id], onDelete: SetNull)
+
+  @@index([eventBookingId])
+  @@index([tourPriceCategoryId])
+  @@map("booking_price_entry")
+}
+
+model BookingEntrySnapshot {
+  id            String   @id @default(cuid())
+  count         Int
+  priceSnapshot Float
+  entryName     String
+  categoryName  String
+  variantName   String
+  createdAt     DateTime @default(now())
+
+  eventBookingId String
+  eventBooking   EventBooking @relation(fields: [eventBookingId], references: [id], onDelete: Cascade)
+  tourEntryId    String?
+  tourEntry      TourEntry?   @relation(fields: [tourEntryId], references: [id], onDelete: SetNull)
+
+  @@index([eventBookingId])
+  @@index([tourEntryId])
+  @@map("booking_entry_snapshot")
+}
+
+model AgencyPriceCategoryOverride {
+  id    String @id @default(cuid())
+  price Float
+
+  agencyTourPricingId String
+  agencyTourPricing   AgencyTourPricing @relation(fields: [agencyTourPricingId], references: [id], onDelete: Cascade)
+  tourPriceCategoryId String
+  tourPriceCategory   TourPriceCategory @relation(fields: [tourPriceCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyTourPricingId, tourPriceCategoryId])
+  @@index([agencyTourPricingId])
+  @@map("agency_price_category_override")
+}
+
+model AgencyEntryOverride {
+  id    String @id @default(cuid())
+  price Float
+
+  agencyTourPricingId String
+  agencyTourPricing   AgencyTourPricing @relation(fields: [agencyTourPricingId], references: [id], onDelete: Cascade)
+  tourEntryId         String
+  tourEntry           TourEntry         @relation(fields: [tourEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyTourPricingId, tourEntryId])
+  @@index([agencyTourPricingId])
+  @@map("agency_entry_override")
+}
+
+// ─── End new pricing models ─────────────────────────────────────────────────
+
+model EventBookingCommission {
+  id               String         @id @default(cuid())
+  kind             CommissionKind @default(REGULAR)
+  percentage       Float
+  baseAmount       Float
+  commissionAmount Float
+  totalPaid        Float
+  paidAt           DateTime       @default(now())
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  eventBookingId String
+  eventBooking   EventBooking @relation(fields: [eventBookingId], references: [id], onDelete: Restrict)
+  paidById       String
+  paidBy         User         @relation("CommissionPaidBy", fields: [paidById], references: [id], onDelete: Restrict)
+
+  @@unique([eventBookingId, kind])
+  @@index([paidById])
+  @@index([kind, paidAt])
+  @@index([paidAt])
+  @@map("event_booking_commission")
+}
+
+enum AUDIT_ACTION {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model AuditLog {
+  id          String       @id @default(cuid())
+  action      AUDIT_ACTION
+  entityType  String
+  entityId    String
+  userId      String?
+  userName    String
+  userEmail   String
+  changes     Json?
+  oldValues   Json?
+  newValues   Json?
+  metadata    Json?
+  description String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+enum PAYMENT_STATUS {
+  PAID
+  PENDING
+}
+
+enum TRANSFER_TYPE {
+  OUTGOING
+  INCOMING
+}
+
+enum TRANSFER_PAYMENT_STATUS {
+  PENDING
+  ENTRANCE_ONLY
+  TOUR_ONLY
+  FULLY_PAID
+}
+
+enum TRANSFER_STATUS {
+  ACTIVE
+  CANCELLED
+}
+
+model AgencyTransfer {
+  id                               String                  @id @default(cuid())
+  voucher                          Int                     @unique
+  type                             TRANSFER_TYPE
+  date                             DateTime                @default(now())
+  paymentStatus                    TRANSFER_PAYMENT_STATUS
+  comments                         String?
+  makePayment                      Boolean                 @default(false)
+  proofOfPayment                   String?
+  agencyNotificationEmailSentAt    DateTime?
+  agencyNotificationEmailSentTo    String?
+  passengerNotificationEmailSentAt DateTime?
+  passengerNotificationEmailSentTo String?
+  executiveNotificationEmailSentAt DateTime?
+  executiveNotificationEmailSentTo String?
+  createdAt                        DateTime                @default(now())
+  updatedAt                        DateTime                @updatedAt
+  status                           TRANSFER_STATUS         @default(ACTIVE)
+  cancelledAt                      DateTime?
+  cancelReason                     String?
+  cancelledById                    String?
+
+  createdBy     String
+  createdByUser User                   @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  cancelledBy   User?                  @relation("TransferCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  saleRecordId  String?
+  saleRecord    SaleRecord?            @relation(fields: [saleRecordId], references: [id], onDelete: Cascade)
+  agencyId      String
+  agency        TransferAgency         @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  eventBookings TransferEventBooking[]
+  passengers    Passenger[]
+  payments      PaymentRecord[]
+  priceDetails  TransferPriceDetail[]
+
+  @@index([date])
+  @@index([type])
+  @@index([voucher])
+  @@index([agencyId])
+  @@index([saleRecordId])
+  @@index([status])
+  @@index([cancelledById])
+  @@map("agency_transfer")
+}
+
+model TransferEventBooking {
+  id             String @id @default(cuid())
+  passengerCount Int
+  adultsCount    Int    @default(0)
+  childrenCount  Int    @default(0)
+  seniorsCount   Int    @default(0)
+
+  eventId    String
+  event      Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  transferId String
+  transfer   AgencyTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  priceDetails TransferPriceDetail[] @relation("EventBookingPriceDetails")
+
+  createdAt DateTime @default(now())
+
+  @@index([eventId])
+  @@index([transferId])
+  @@map("transfer_event_booking")
+}
+
+model TransferPriceDetail {
+  id            String @id @default(cuid())
+  passengerName String
+  ageCategory   String
+  tourPrice     Float
+  entrancePrice Float  @default(0)
+  totalPrice    Float
+
+  sourcePassengerId String?
+  sourcePassenger   Passenger?     @relation("PassengerTransferPrices", fields: [sourcePassengerId], references: [id], onDelete: SetNull)
+  transferId        String
+  transfer          AgencyTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  eventBookingId String?
+  eventBooking   TransferEventBooking? @relation("EventBookingPriceDetails", fields: [eventBookingId], references: [id], onDelete: SetNull)
+
+  @@unique([transferId, sourcePassengerId])
+  @@index([transferId])
+  @@index([sourcePassengerId])
+  @@index([eventBookingId])
+  @@map("transfer_price_detail")
+}
+
+// ==================== FLUJO DE CAJA (CASH FLOW) ====================
+
+enum CASH_ENTRY_TYPE {
+  INCOME // Ingreso (venta en efectivo)
+  DEPOSIT // Depósito bancario (retiro de caja)
+  SUPPLIER_PAYMENT // Pago a proveedor
+  OTHER_EXPENSE // Otros gastos
+  CURRENCY_EXCHANGE // Cambio de moneda (USD <-> CLP)
+}
+
+enum CASH_COUNT_TYPE {
+  OPENING // Apertura de caja
+  CLOSING // Cierre de caja
+}
+
+enum EXPENSE_CATEGORY {
+  SUPPLIES // Suministros
+  TRANSPORTATION // Transporte
+  FOOD // Alimentación
+  OTHER // Otros
+}
+
+model CashBox {
+  id                String   @id @default(cuid())
+  date              DateTime @unique @db.Date // Una caja por día
+  initialBalance    Float    @default(0)
+  finalBalance      Float?
+  initialUsdBalance Float    @default(0)
+  finalUsdBalance   Float?
+  status            String   @default("OPEN") // OPEN, CLOSED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  entries  CashBoxEntry[]
+  counts   CashCount[]
+  deposits CashDeposit[]
+  payments SupplierPayment[]
+
+  @@index([date])
+  @@index([status])
+  @@map("cash_box")
+}
+
+model CashBoxEntry {
+  id             String            @id @default(cuid())
+  type           CASH_ENTRY_TYPE
+  amount         Float // Positivo para ingresos, negativo para egresos
+  currency       CURRENCY_TYPE     @default(CLP)
+  originalAmount Float?
+  exchangeRate   Float?
+  description    String
+  reference      String? // Número de voucher o referencia
+  category       EXPENSE_CATEGORY? // Solo para OTHER_EXPENSE
+  paymentMethod  PAYMENT_METHOD? // Método de pago (CASH, TRANSFER, CREDIT_CARD, etc.)
+  createdAt      DateTime          @default(now())
+
+  cashBoxId String
+  cashBox   CashBox @relation(fields: [cashBoxId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("CashBoxEntries", fields: [createdById], references: [id])
+
+  // Para vincular con pago de venta (opcional)
+  paymentRecordId String?
+
+  // Para vincular con traspaso (opcional)
+  transferId String?
+
+  @@index([cashBoxId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("cash_box_entry")
+}
+
+model CashCount {
+  id             String          @id @default(cuid())
+  type           CASH_COUNT_TYPE
+  countedAmount  Float // Monto contado físicamente
+  expectedAmount Float? // Monto esperado (calculado)
+  difference     Float? // Diferencia (contado - esperado)
+  notes          String?
+  createdAt      DateTime        @default(now())
+
+  cashBoxId String
+  cashBox   CashBox @relation(fields: [cashBoxId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("CashCounts", fields: [createdById], references: [id])
+
+  @@index([cashBoxId])
+  @@index([type])
+  @@map("cash_count")
+}
+
+model CashDeposit {
+  id          String   @id @default(cuid())
+  amount      Float
+  bankAccount String? // Cuenta bancaria destino
+  reference   String? // Número de referencia del depósito
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  cashBoxId String
+  cashBox   CashBox @relation(fields: [cashBoxId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("CashDeposits", fields: [createdById], references: [id])
+
+  @@index([cashBoxId])
+  @@index([createdAt])
+  @@map("cash_deposit")
+}
+
+model SupplierPayment {
+  id            String   @id @default(cuid())
+  amount        Float
+  supplier      String // Nombre del proveedor (si no hay provider vinculado)
+  concept       String // Concepto del pago
+  invoiceNumber String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  cashBoxId String
+  cashBox   CashBox @relation(fields: [cashBoxId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("SupplierPayments", fields: [createdById], references: [id])
+
+  // Opcional: vincular con Provider existente
+  providerId String?
+  provider   Provider? @relation("SupplierPayments", fields: [providerId], references: [id])
+
+  @@index([cashBoxId])
+  @@index([providerId])
+  @@index([createdAt])
+  @@map("supplier_payment")
+}

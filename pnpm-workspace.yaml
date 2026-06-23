@@ -1,0 +1,14 @@
+allowBuilds:
+  '@prisma/engines': true
+  '@tailwindcss/oxide': true
+  cpu-features: false
+  esbuild: true
+  msw: true
+  prisma: true
+  protobufjs: false
+  sharp: true
+  ssh2: false
+  unrs-resolver: true
+ignoredBuiltDependencies:
+  - '@prisma/engines'
+  - prisma
