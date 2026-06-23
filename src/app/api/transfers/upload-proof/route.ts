@@ -1,8 +1,8 @@
-import { put } from "@vercel/blob"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 
 import { auth } from "@/lib/auth"
+import { uploadBlob } from "@/lib/blob"
 import { canCurrentUserInteractPath } from "@/project/roles/actions/role.actions"
 
 const ALLOWED_CONTENT_TYPES = [
@@ -52,8 +52,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 		const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_")
 		const blobPath = `transfers/proofs/${Date.now()}-${sanitizedFilename}`
 
-		const blob = await put(blobPath, request.body as ReadableStream, {
-			access: "public",
+		const blob = await uploadBlob(blobPath, request.body as ReadableStream, {
 			contentType,
 		})
 
@@ -61,6 +60,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 			success: true,
 			url: blob.url,
 			pathname: blob.pathname,
+			...(blob.simulated ? { simulated: true, message: "simulado en modo demo" } : {}),
 		})
 	} catch (error) {
 		console.error("Error uploading proof of payment:", error)
