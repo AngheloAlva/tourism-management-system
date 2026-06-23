@@ -35,20 +35,27 @@ export default async function RootLayout({
 	// again with the demo token to validate it against the PGlite snapshot.
 	if (IS_DEMO && !session) {
 		const cookieStore = await cookies()
-		cookieStore.set(BA_COOKIE_NAME, DEMO_SESSION_TOKEN, {
-			httpOnly: true,
-			sameSite: "lax",
-			path: "/",
-			// Max-age: 1 year (the seeded session itself expires 2099)
-			maxAge: 60 * 60 * 24 * 365,
-		})
+		const alreadyTriedDemoLogin =
+			cookieStore.get(BA_COOKIE_NAME)?.value === DEMO_SESSION_TOKEN
 
-		// Re-read session with the newly set cookie by forwarding the updated
-		// cookie header. Better Auth nextCookies plugin already reads from the
-		// Next.js cookie store, so getting headers again picks it up.
-		session = await auth.api.getSession({
-			headers: await headers(),
-		})
+		// First visit: the request carries no session cookie. Set the pre-seeded
+		// demo token and redirect. The Set-Cookie reaches the browser via the
+		// redirect response, and the NEXT request carries the cookie in its
+		// headers for Better Auth to resolve. Re-calling getSession in this same
+		// request can't work — the request's already-parsed headers don't include
+		// the cookie we just set.
+		if (!alreadyTriedDemoLogin) {
+			cookieStore.set(BA_COOKIE_NAME, DEMO_SESSION_TOKEN, {
+				httpOnly: true,
+				sameSite: "lax",
+				path: "/",
+				// Max-age: 1 year (the seeded session itself expires 2099)
+				maxAge: 60 * 60 * 24 * 365,
+			})
+			redirect("/dashboard/inicio")
+		}
+		// Cookie already present but still no session → the seeded token didn't
+		// resolve. Fall through to redirect("/") below instead of looping.
 	}
 
 	if (!session) {
