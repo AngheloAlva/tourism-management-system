@@ -26,9 +26,6 @@ export default async function RootLayout({
 		headers: await headers(),
 	})
 
-	// TEMP DEBUG — confirms whether the cookie resolves in the deployed runtime.
-	console.log("[dashboard-layout]", { isDemo: IS_DEMO, hasSession: Boolean(session) })
-
 	if (!session) {
 		return redirect("/")
 	}

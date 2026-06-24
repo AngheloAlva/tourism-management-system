@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 
 import { IS_DEMO } from "@/lib/demo"
-import { prisma } from "@/lib/prisma"
 
 /** Long-lived session token seeded into the PGlite snapshot (see seed/users.ts). */
 const DEMO_SESSION_TOKEN = "demo-session-token-atacama-2026"
@@ -31,19 +30,6 @@ async function signDemoSessionCookie(secret: string): Promise<string> {
 
 export async function GET(request: Request) {
 	const secret = process.env.BETTER_AUTH_SECRET
-
-	// TEMP DEBUG — confirms env + snapshot are visible in this runtime.
-	let sessionCount = -1
-	try {
-		sessionCount = await prisma.session.count()
-	} catch (error) {
-		console.error("[demo-login] session.count failed:", error)
-	}
-	console.log("[demo-login]", {
-		isDemo: IS_DEMO,
-		hasSecret: Boolean(secret),
-		sessionCount,
-	})
 
 	if (!IS_DEMO || !secret) {
 		return NextResponse.redirect(new URL("/", request.url))
