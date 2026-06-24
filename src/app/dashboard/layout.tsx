@@ -20,11 +20,14 @@ export default async function RootLayout({
 }: Readonly<{
 	children: React.ReactNode
 }>) {
-	// In demo mode the proxy injects the pre-seeded session cookie into the
-	// request, so getSession resolves transparently on the first render.
+	// In demo mode the /api/demo-login route handler sets the pre-seeded session
+	// cookie before we get here, so getSession resolves on the first render.
 	const session = await auth.api.getSession({
 		headers: await headers(),
 	})
+
+	// TEMP DEBUG — confirms whether the cookie resolves in the deployed runtime.
+	console.log("[dashboard-layout]", { isDemo: IS_DEMO, hasSession: Boolean(session) })
 
 	if (!session) {
 		return redirect("/")

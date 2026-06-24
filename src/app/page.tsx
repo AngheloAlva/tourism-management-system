@@ -9,10 +9,10 @@ import Logo from "@/shared/components/sidebar/logo"
 import loginImage from "../../public/images/login.jpg"
 
 export default function Home() {
-	// In demo mode, skip the login page entirely — the dashboard layout handles
-	// auto-login via the seeded session token.
+	// In demo mode, skip the login page entirely — the /api/demo-login route
+	// handler sets the pre-seeded session cookie, then sends us to the dashboard.
 	if (IS_DEMO) {
-		redirect("/dashboard/inicio")
+		redirect("/api/demo-login")
 	}
 
 	return (
